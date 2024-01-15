@@ -31,6 +31,7 @@ type tags struct {
 type Lustre2 struct {
 	OstProcfiles []string `toml:"ost_procfiles"`
 	MdsProcfiles []string `toml:"mds_procfiles"`
+	LnetProcfiles []string `toml:"lnet_procfiles"`
 
 	// allFields maps and OST name to the metric fields associated with that OST
 	allFields map[tags]map[string]interface{}
@@ -348,6 +349,64 @@ var wantedMdtJobstatsFields = []*mapping{
 	},
 }
 
+var wantedLnetFields = []*mapping{
+	{
+	        inProc:   "lnet",
+		field:    0,
+		reportAs: "lnet_msgs_alloc",
+	},
+	{
+	        inProc:   "lnet",
+		field:    1,
+		reportAs: "lnet_msgs_max",
+	},
+	{
+	        inProc:   "lnet",
+		field:    2,
+		reportAs: "lnet_rst_alloc",
+	},
+	{
+	        inProc:   "lnet",
+		field:    3,
+		reportAs: "lnet_send_count",
+	},
+	{
+	        inProc:   "lnet",
+		field:    4,
+		reportAs: "lnet_recv_count",
+	},
+	{
+	        inProc:   "lnet",
+		field:    5,
+		reportAs: "lnet_route_count",
+	},
+	{
+	        inProc:   "lnet",
+		field:    6,
+		reportAs: "lnet_drop_count",
+	},
+	{
+	        inProc:   "lnet",
+		field:    7,
+		reportAs: "lnet_send_length",
+	},
+	{
+	        inProc:   "lnet",
+		field:    8,
+		reportAs: "lnet_recv_length",
+	},
+	{
+	        inProc:   "lnet",
+		field:    9,
+		reportAs: "lnet_route_length",
+	},
+	{
+	        inProc:   "lnet",
+		field:    10,
+		reportAs: "lnet_drop_length",
+	},
+}
+
 func (*Lustre2) SampleConfig() string {
 	return sampleConfig
 }
@@ -376,6 +435,8 @@ func (l *Lustre2) GetLustreProcStats(fileglob string, wantedFields []*mapping) e
 		if strings.Contains(file, "/exports/") {
 			name = path[len(path)-4]
 			client = path[len(path)-2]
+		} else if strings.Contains(file, "/lnet/") {
+		        // do nothing since we don't want lnet tagged
 		} else {
 			name = path[len(path)-2]
 			client = ""
@@ -433,6 +494,18 @@ func (l *Lustre2) GetLustreProcStats(fileglob string, wantedFields []*mapping) e
 						}
 						fields[reportName] = data
 					}
+					if wanted.inProc == "lnet" {
+						wantedField := wanted.field
+						data, err = strconv.ParseUint(strings.TrimSuffix(parts[wantedField], ","), 10, 64)
+						if err != nil {
+							return err
+						}
+						reportName := wanted.inProc
+						if wanted.reportAs != "" {
+							reportName = wanted.reportAs
+						}
+						fields[reportName] = data
+					}
 				}
 			}
 		}
@@ -476,6 +549,14 @@ func (l *Lustre2) Gather(acc telegraf.Accumulator) error {
 		}
 	}
 
+	if len(l.LnetProcfiles) == 0 {
+		// Lnet stats
+		err := l.GetLustreProcStats("/sys/kernel/debug/lnet/stats", wantedLnetFields)
+		if err != nil {
+			return err
+		}
+	}
+
 	for _, procfile := range l.OstProcfiles {
 		ostFields := wantedOstFields
 		if strings.HasSuffix(procfile, "job_stats") {
@@ -492,6 +573,14 @@ func (l *Lustre2) Gather(acc telegraf.Accumulator) error {
 			mdtFields = wantedMdtJobstatsFields
 		}
 		err := l.GetLustreProcStats(procfile, mdtFields)
+		if err != nil {
+			return err
+		}
+	}
+
+	for _, procfile := range l.LnetProcfiles {
+		lnetFields := wantedLnetFields
+		err := l.GetLustreProcStats(procfile, lnetFields)
 		if err != nil {
 			return err
 		}
