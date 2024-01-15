@@ -131,6 +131,8 @@ const mdtJobStatsContents = `job_stats:
   crossdir_rename: { samples:         201, unit:  reqs }
 `
 
+const lnetProcContents = `0 7 0 20481 28239 0 0 8892268623 8225856 0 0`
+
 func TestLustre2GeneratesMetrics(t *testing.T) {
 	tmpDir, err := os.MkdirTemp("", "telegraf-lustre")
 	require.NoError(t, err)
@@ -396,6 +398,46 @@ func TestLustre2GeneratesJobstatsMetrics(t *testing.T) {
 	}
 }
 
+func TestLustre2GeneratesLnetMetrics(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "telegraf-lustre")
+	require.NoError(t, err)
+	defer os.RemoveAll(tmpDir)
+
+	tempdir := tmpDir + "/telegraf/sys/kernel/debug/"
+
+	lnetdir := tempdir + "/lnet/"
+	err = os.MkdirAll(lnetdir, 0750)
+	require.NoError(t, err)
+
+	err = os.WriteFile(lnetdir+"/stats", []byte(lnetProcContents), 0640)
+	require.NoError(t, err)
+
+	m := &Lustre2{
+		LnetProcfiles: []string{lnetdir + "/stats"},
+	}
+
+	var acc testutil.Accumulator
+
+	err = m.Gather(&acc)
+	require.NoError(t, err)
+
+	fields := map[string]interface{}{
+		"lnet_msgs_alloc":      uint64(0),
+                "lnet_msgs_max":        uint64(7),
+                "lnet_rst_alloc":       uint64(0),
+                "lnet_send_count":      uint64(20481),
+                "lnet_recv_count":      uint64(28239),
+                "lnet_route_count":     uint64(0),
+                "lnet_drop_count":      uint64(0),
+                "lnet_send_length":     uint64(8892268623),
+                "lnet_recv_length":     uint64(8225856),
+                "lnet_route_length":    uint64(0),
+                "lnet_drop_length":     uint64(0),
+	}
+
+	acc.AssertContainsFields(t, "lustre2", fields)
+}
+
 func TestLustre2CanParseConfiguration(t *testing.T) {
 	config := []byte(`
 [[inputs.lustre2]]
@@ -405,6 +447,9 @@ func TestLustre2CanParseConfiguration(t *testing.T) {
    ]
    mds_procfiles = [
      "/proc/fs/lustre/mdt/*/md_stats",
+   ]
+   lnet_procfiles = [
+     "/sys/kernel/debug/lnet/stats",
    ]`)
 
 	table, err := toml.Parse(config)
@@ -427,6 +472,9 @@ func TestLustre2CanParseConfiguration(t *testing.T) {
 		},
 		MdsProcfiles: []string{
 			"/proc/fs/lustre/mdt/*/md_stats",
+		},
+		LnetProcfiles: []string{
+			"/sys/kernel/debug/lnet/stats",
 		},
 	}, plugin)
 }
