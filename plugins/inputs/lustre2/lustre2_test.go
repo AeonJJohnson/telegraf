@@ -435,7 +435,8 @@ func TestLustre2GeneratesLnetMetrics(t *testing.T) {
                 "lnet_drop_length":     uint64(0),
 	}
 
-	acc.AssertContainsFields(t, "lustre2", fields)
+//	acc.AssertContainsFields(t, "lustre2", fields)
+	acc.AssertContainsTaggedFields(t, "lustre2", fields, tags)
 }
 
 func TestLustre2CanParseConfiguration(t *testing.T) {

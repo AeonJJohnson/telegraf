@@ -436,7 +436,8 @@ func (l *Lustre2) GetLustreProcStats(fileglob string, wantedFields []*mapping) e
 			name = path[len(path)-4]
 			client = path[len(path)-2]
 		} else if strings.Contains(file, "/lnet/") {
-		        // do nothing since we don't want lnet tagged
+			name = "lnet"
+			client = ""
 		} else {
 			name = path[len(path)-2]
 			client = ""
@@ -551,6 +552,8 @@ func (l *Lustre2) Gather(acc telegraf.Accumulator) error {
 
 	if len(l.LnetProcfiles) == 0 {
 		// Lnet stats
+		// Currently failes because /sys/kernel/debug is 0700 and telegraf can't descend to
+		// /sys/kernel/debug/lnet to read stats
 		err := l.GetLustreProcStats("/sys/kernel/debug/lnet/stats", wantedLnetFields)
 		if err != nil {
 			return err
