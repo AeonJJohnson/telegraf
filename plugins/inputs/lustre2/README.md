@@ -200,8 +200,8 @@ From `/proc/fs/lustre/mdt/*/job_stats`:
 
 From `/sys/kernel/debug/lnet/stats`:
 
-## The below lnet metrics fields are renamed with prefix 'lnet_' using ReportAs option in lustre2.go 
-## This is done for clarity, to differentiate lnet metrics from obdfilter based metrics.
+The below lnet metrics fields are renamed with prefix 'lnet_' using ReportAs option in lustre2.go 
+This is done for clarity, to differentiate lnet metrics from obdfilter based metrics.
 
 - lustre2
   - fields:
