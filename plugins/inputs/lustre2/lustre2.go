@@ -349,6 +349,8 @@ var wantedMdtJobstatsFields = []*mapping{
 	},
 }
 
+// lnet stats file (/sys/kernel/debug/lnet/stats) is a single line file with no headers or labels so
+// we hard set inProc as "lnet" to use the current function with little modification
 var wantedLnetFields = []*mapping{
 	{
 	        inProc:   "lnet",
@@ -551,9 +553,12 @@ func (l *Lustre2) Gather(acc telegraf.Accumulator) error {
 	}
 
 	if len(l.LnetProcfiles) == 0 {
-		// Lnet stats
-		// Currently failes because /sys/kernel/debug is 0700 and telegraf can't descend to
-		// /sys/kernel/debug/lnet to read stats
+		// Due to default debugfs directory permissions reading the lnet stats file as a
+		// non-root user is not possible. Modifying systemd:sys-kernel-debug.mount to add
+		// an options line "Options=uid=0,gid=$(id -g telegraf),mode=0750" followed by running
+		// 'systemctl daemon-reload' and 'systemctl restart sys-kernel-debug.mount' enables
+		// lnet metrics monitoring without running telegraf as root, which seems like a
+		// bigger security exposure.  
 		err := l.GetLustreProcStats("/sys/kernel/debug/lnet/stats", wantedLnetFields)
 		if err != nil {
 			return err

@@ -40,6 +40,38 @@ See the [CONFIGURATION.md][CONFIGURATION.md] for more details.
   # ]
 ```
 
+## Optional Configuration
+
+In order to read lnet metrics present in debugfs a local systemd module change
+is needed to have correct permissions for telegraf process user without running
+telegraf as root or completely opening debugfs.
+
+Add a local systemd customization `/etc/systemd/system/sys-kernel-debug.mount`
+that adds debugfs mount options that make debugfs mount with gid of telegraf
+group id and mode g+rx for the debugfs mountpoint under /sys/kernel.
+
+```
+[Unit]
+Description=Kernel Debug File System
+Documentation=https://www.kernel.org/doc/Documentation/filesystems/debugfs.txt
+Documentation=https://www.freedesktop.org/wiki/Software/systemd/APIFileSystems
+DefaultDependencies=no
+ConditionPathExists=/sys/kernel/debug
+ConditionCapability=CAP_SYS_RAWIO
+Before=sysinit.target
+
+[Mount]
+What=debugfs
+Where=/sys/kernel/debug
+Type=debugfs
+Options=uid=0,gid=XXXX,mode=0750
+```
+where the value of `gid=XXXX` is the output of `id -g telegraf`
+
+note, any creation of or modification to a systemd module file requires running
+`systemctl daemon-reload` and if currently running, a restart of the module
+`systemctl restart sys-kernel-debug.mount` to take effect.
+
 ## Metrics
 
 From `/proc/fs/lustre/obdfilter/*/stats` and
@@ -168,19 +200,22 @@ From `/proc/fs/lustre/mdt/*/job_stats`:
 
 From `/sys/kernel/debug/lnet/stats`:
 
+## The below lnet metrics fields are renamed with prefix 'lnet_' using ReportAs option in lustre2.go 
+## This is done for clarity, to differentiate lnet metrics from obdfilter based metrics.
+
 - lustre2
   - fields:
-    - msgs_alloc
-    - msgs_max
-    - rst_alloc
-    - send_count
-    - recv_count
-    - route_count
-    - drop_count
-    - send_length
-    - recv_length
-    - route_length
-    - drop_length
+    - msgs_alloc     #  renamed to lnet_msgs_alloc
+    - msgs_max       #  renamed to lnet_msgs_max
+    - rst_alloc      #  renamed to lnet_rst_alloc
+    - send_count     #  renamed to lnet_send_count
+    - recv_count     #  renamed to lnet_recv_count
+    - route_count    #  renamed to lnet_route_count
+    - drop_count     #  renamed to lnet_drop_count
+    - send_length    #  renamed to lnet_send_length
+    - recv_length    #  renamed to lnet_recv_length
+    - route_length   #  renamed to lnet_route_length
+    - drop_length    #  renamed to lnet_drop_length
 
 ## Troubleshooting
 
@@ -194,7 +229,7 @@ corresponding to the above metric fields.
 ```text
 lustre2,host=oss2,jobid=42990218,name=wrk-OST0041 jobstats_ost_setattr=0i,jobstats_ost_sync=0i,jobstats_punch=0i,jobstats_read_bytes=4096i,jobstats_read_calls=1i,jobstats_read_max_size=4096i,jobstats_read_min_size=4096i,jobstats_write_bytes=310206488i,jobstats_write_calls=7423i,jobstats_write_max_size=53048i,jobstats_write_min_size=8820i 1556525847000000000
 lustre2,host=mds1,jobid=42992017,name=wrk-MDT0000 jobstats_close=31798i,jobstats_crossdir_rename=0i,jobstats_getattr=34146i,jobstats_getxattr=15i,jobstats_link=0i,jobstats_mkdir=658i,jobstats_mknod=0i,jobstats_open=31797i,jobstats_rename=0i,jobstats_rmdir=0i,jobstats_samedir_rename=0i,jobstats_setattr=1788i,jobstats_setxattr=0i,jobstats_statfs=0i,jobstats_sync=0i,jobstats_unlink=0i 1556525828000000000
-lustre2,host=oss2 lnet_msgs_max=20i,lnet_rst_alloc=0i,lnet_send_count=1087679i,lnet_send_length=336104672i,lnet_recv_length=77316595816i,lnet_drop_length=4160i,lnet_msgs_alloc=0i,lnet_route_count=0i,lnet_drop_count=9i,lnet_route_length=0i,lnet_recv_count=1089012i 1556525828000000000
+lustre2,host=oss2,name=lnet lnet_msgs_max=20i,lnet_rst_alloc=0i,lnet_send_count=1087679i,lnet_send_length=336104672i,lnet_recv_length=77316595816i,lnet_drop_length=4160i,lnet_msgs_alloc=0i,lnet_route_count=0i,lnet_drop_count=9i,lnet_route_length=0i,lnet_recv_count=1089012i 1556525828000000000
 ```
 
 [lustre]: http://lustre.org/

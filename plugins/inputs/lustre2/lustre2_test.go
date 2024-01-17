@@ -421,6 +421,10 @@ func TestLustre2GeneratesLnetMetrics(t *testing.T) {
 	err = m.Gather(&acc)
 	require.NoError(t, err)
 
+	tags := map[string]string{
+		"name":   "lnet",
+	}
+
 	fields := map[string]interface{}{
 		"lnet_msgs_alloc":      uint64(0),
                 "lnet_msgs_max":        uint64(7),
